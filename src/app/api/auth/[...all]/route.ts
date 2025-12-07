@@ -2,6 +2,13 @@ import { auth } from "@/lib/auth"
 import { toNextJsHandler } from "better-auth/next-js"
 import { NextRequest } from "next/server"
 
+// Next.js catch-all route params type
+type RouteParams = {
+  params: {
+    all: string[]
+  }
+}
+
 console.log("[ROUTE INIT] Route module loading...")
 console.log("[ROUTE INIT] NODE_ENV:", process.env.NODE_ENV)
 console.log("[ROUTE INIT] Imports completed")
@@ -40,7 +47,7 @@ console.log("[ROUTE INIT] baseGET ready:", !!baseGET)
 console.log("[ROUTE INIT] basePOST ready:", !!basePOST)
 
 // Wrap handlers with error handling and logging
-export async function GET(request: NextRequest) {
+export async function GET(request: NextRequest, context: RouteParams) {
   console.log("[API GET] ========== GET REQUEST RECEIVED ==========")
   console.log("[API GET] Request URL:", request.url)
   console.log("[API GET] Request method:", request.method)
@@ -86,10 +93,11 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(request: NextRequest, context: RouteParams) {
   console.log("[API POST] ========== POST REQUEST RECEIVED ==========")
   console.log("[API POST] Request URL:", request.url)
   console.log("[API POST] Request method:", request.method)
+  console.log("[API POST] Route params:", context.params.all)
   console.log("[API POST] basePOST handler available:", !!basePOST)
   
   try {
