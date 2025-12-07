@@ -56,9 +56,9 @@ export default function Home() {
                     provider: "google",
                   })
                   console.log("Sign in result:", result)
-                  // If result has a URL, redirect to it
-                  if (result?.url) {
-                    window.location.href = result.url
+                  // Check if result has data with url property
+                  if (result?.data && 'url' in result.data && result.data.url) {
+                    window.location.href = result.data.url
                   }
                 } catch (error) {
                   console.error("Sign in error:", error)
