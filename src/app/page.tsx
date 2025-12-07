@@ -50,10 +50,15 @@ export default function Home() {
             <p className="text-lg mb-4">Please sign in with your Google account</p>
             <button
               onClick={() => {
-                console.log("Sign in button clicked")
-                // Redirect directly to the better-auth social sign-in endpoint
-                const baseURL = process.env.NEXT_PUBLIC_APP_URL || window.location.origin
-                window.location.href = `${baseURL}/api/auth/sign-in/social/google`
+                // Use better-auth client function which should handle redirect
+                // If it doesn't work, check browser console for errors
+                signIn.social({
+                  provider: "google",
+                }).catch((error) => {
+                  console.error("Sign in error:", error)
+                  // Fallback: direct redirect to auth endpoint
+                  window.location.href = `/api/auth/sign-in/social/google`
+                })
               }}
               className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
             >
