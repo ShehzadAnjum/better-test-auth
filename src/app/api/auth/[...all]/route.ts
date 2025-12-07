@@ -1,10 +1,9 @@
-console.log("[ROUTE INIT] Route module loading...")
-console.log("[ROUTE INIT] NODE_ENV:", process.env.NODE_ENV)
-
 import { auth } from "@/lib/auth"
 import { toNextJsHandler } from "better-auth/next-js"
 import { NextRequest } from "next/server"
 
+console.log("[ROUTE INIT] Route module loading...")
+console.log("[ROUTE INIT] NODE_ENV:", process.env.NODE_ENV)
 console.log("[ROUTE INIT] Imports completed")
 console.log("[ROUTE INIT] auth object received:", !!auth)
 console.log("[ROUTE INIT] auth.handler exists:", !!(auth as any)?.handler)
