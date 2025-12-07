@@ -4,30 +4,38 @@ import { Pool } from "pg"
 // Lazy initialization of database pool
 // This prevents errors during build time when DATABASE_URL might not be set
 let pool: Pool | null = null
+let poolConnectionString: string | null = null
 
 const getPool = () => {
-  if (!pool) {
-    const databaseUrl = process.env.DATABASE_URL
-    
-    // During build time, use a placeholder connection
-    // The actual connection will be established at runtime when the API is called
-    if (!databaseUrl) {
-      // Always use placeholder if DATABASE_URL is not set during initialization
-      // This allows builds to complete. At runtime, if DATABASE_URL is still missing,
-      // the connection will fail gracefully and the error will be caught by better-auth
-      pool = new Pool({
-        connectionString: "postgresql://placeholder:placeholder@localhost:5432/placeholder",
-        max: 1,
-      })
-    } else {
-      // We have a real DATABASE_URL - use it
-      pool = new Pool({
-        connectionString: databaseUrl,
-        // Optimize for serverless environments
-        max: 1,
-      })
+  const databaseUrl = process.env.DATABASE_URL
+  
+  // If we have a real DATABASE_URL and either:
+  // 1. Pool doesn't exist yet, OR
+  // 2. Pool exists but was created with placeholder, OR
+  // 3. DATABASE_URL has changed
+  // Then create/update the pool
+  if (databaseUrl && (!pool || poolConnectionString !== databaseUrl)) {
+    // Close existing pool if it was a placeholder
+    if (pool && poolConnectionString !== databaseUrl) {
+      pool.end().catch(() => {}) // Ignore errors when closing
     }
+    pool = new Pool({
+      connectionString: databaseUrl,
+      // Optimize for serverless environments
+      max: 1,
+    })
+    poolConnectionString = databaseUrl
+  } else if (!pool) {
+    // No DATABASE_URL available - use placeholder for build time
+    // This allows builds to complete. At runtime, if DATABASE_URL is still missing,
+    // the connection will fail when actually used, which is expected behavior
+    pool = new Pool({
+      connectionString: "postgresql://placeholder:placeholder@localhost:5432/placeholder",
+      max: 1,
+    })
+    poolConnectionString = "postgresql://placeholder:placeholder@localhost:5432/placeholder"
   }
+  
   return pool
 }
 
