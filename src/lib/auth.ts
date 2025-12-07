@@ -69,6 +69,50 @@ console.log("[AUTH INIT] Creating betterAuth instance...")
 const poolInstance = getPool()
 console.log("[AUTH INIT] Pool instance obtained:", !!poolInstance)
 
+// Determine base URL - prioritize explicit config, then Vercel URL, then fallback
+const getBaseURL = () => {
+  // Explicit configuration takes priority
+  if (process.env.BETTER_AUTH_URL) {
+    return process.env.BETTER_AUTH_URL
+  }
+  
+  // On Vercel, use the deployment URL
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`
+  }
+  
+  // Fallback to public app URL or localhost
+  return process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+}
+
+const baseURL = getBaseURL()
+console.log("[AUTH INIT] Final baseURL:", baseURL)
+console.log("[AUTH INIT] VERCEL_URL:", process.env.VERCEL_URL)
+console.log("[AUTH INIT] VERCEL:", process.env.VERCEL)
+
+// Build trusted origins for Vercel preview deployments
+// This allows preview branches (e.g., branch-abc.vercel.app) to work
+const trustedOrigins: string[] = []
+if (process.env.VERCEL) {
+  // Add current Vercel URL if available
+  if (process.env.VERCEL_URL) {
+    trustedOrigins.push(`https://${process.env.VERCEL_URL}`)
+  }
+  // Add wildcard for preview deployments
+  trustedOrigins.push("https://*.vercel.app")
+}
+// Always trust localhost for development
+if (process.env.NODE_ENV !== "production") {
+  trustedOrigins.push("http://localhost:3000")
+}
+// Add explicit trusted origins from env if set
+if (process.env.BETTER_AUTH_TRUSTED_ORIGINS) {
+  const explicitOrigins = process.env.BETTER_AUTH_TRUSTED_ORIGINS.split(",").map(o => o.trim())
+  trustedOrigins.push(...explicitOrigins)
+}
+
+console.log("[AUTH INIT] Trusted origins:", trustedOrigins)
+
 const authConfig = {
   database: poolInstance,
   emailAndPassword: {
@@ -80,9 +124,24 @@ const authConfig = {
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     },
   },
-  baseURL: process.env.BETTER_AUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+  baseURL,
   basePath: "/api/auth",
   secret: process.env.BETTER_AUTH_SECRET!,
+  // Advanced configuration for Vercel compatibility
+  advanced: {
+    // Trust origins for preview deployments
+    trustedOrigins: trustedOrigins.length > 0 ? trustedOrigins : undefined,
+    // Cookie configuration for Vercel
+    cookies: {
+      sessionToken: {
+        attributes: {
+          sameSite: "lax" as const,
+          secure: process.env.NODE_ENV === "production" || process.env.VERCEL === "1",
+          // Don't set domain explicitly - let it default to current domain
+        },
+      },
+    },
+  },
 }
 
 console.log("[AUTH INIT] Auth config prepared, calling betterAuth()...")
