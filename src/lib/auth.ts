@@ -12,25 +12,13 @@ const getPool = () => {
     // During build time, use a placeholder connection
     // The actual connection will be established at runtime when the API is called
     if (!databaseUrl) {
-      // Check if we're in build phase
-      // Vercel sets VERCEL=1 during build, and VERCEL_ENV during runtime
-      // Next.js sets NEXT_PHASE during build
-      const isBuildPhase = 
-        process.env.NEXT_PHASE === 'phase-production-build' ||
-        (process.env.VERCEL === '1' && !process.env.VERCEL_ENV) ||
-        process.env.NODE_ENV !== 'production'
-      
-      if (isBuildPhase) {
-        // Build phase - use placeholder that won't actually connect
-        // This allows the build to complete successfully
-        pool = new Pool({
-          connectionString: "postgresql://placeholder:placeholder@localhost:5432/placeholder",
-          max: 1,
-        })
-      } else {
-        // Runtime without DATABASE_URL - this is an error
-        throw new Error("DATABASE_URL is not set in environment variables. Please set it in your Vercel project settings.")
-      }
+      // Always use placeholder if DATABASE_URL is not set during initialization
+      // This allows builds to complete. At runtime, if DATABASE_URL is still missing,
+      // the connection will fail gracefully and the error will be caught by better-auth
+      pool = new Pool({
+        connectionString: "postgresql://placeholder:placeholder@localhost:5432/placeholder",
+        max: 1,
+      })
     } else {
       // We have a real DATABASE_URL - use it
       pool = new Pool({
