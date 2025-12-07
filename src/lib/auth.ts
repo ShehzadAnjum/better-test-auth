@@ -1,13 +1,20 @@
 import { betterAuth } from "better-auth"
 import { Pool } from "pg"
 
+console.log("[AUTH INIT] Starting auth module initialization...")
+console.log("[AUTH INIT] NODE_ENV:", process.env.NODE_ENV)
+console.log("[AUTH INIT] VERCEL:", process.env.VERCEL)
+
 // Lazy initialization of database pool
 // This prevents errors during build time when DATABASE_URL might not be set
 let pool: Pool | null = null
 let poolConnectionString: string | null = null
 
 const getPool = () => {
+  console.log("[AUTH INIT] getPool() called")
   const databaseUrl = process.env.DATABASE_URL
+  console.log("[AUTH INIT] DATABASE_URL exists:", !!databaseUrl)
+  console.log("[AUTH INIT] DATABASE_URL length:", databaseUrl?.length || 0)
   
   // If we have a real DATABASE_URL and either:
   // 1. Pool doesn't exist yet, OR
@@ -15,17 +22,26 @@ const getPool = () => {
   // 3. DATABASE_URL has changed
   // Then create/update the pool
   if (databaseUrl && (!pool || poolConnectionString !== databaseUrl)) {
+    console.log("[AUTH INIT] Creating new pool with real DATABASE_URL")
     // Close existing pool if it was a placeholder
     if (pool && poolConnectionString !== databaseUrl) {
+      console.log("[AUTH INIT] Closing old pool")
       pool.end().catch(() => {}) // Ignore errors when closing
     }
-    pool = new Pool({
-      connectionString: databaseUrl,
-      // Optimize for serverless environments
-      max: 1,
-    })
-    poolConnectionString = databaseUrl
+    try {
+      pool = new Pool({
+        connectionString: databaseUrl,
+        // Optimize for serverless environments
+        max: 1,
+      })
+      poolConnectionString = databaseUrl
+      console.log("[AUTH INIT] Pool created successfully")
+    } catch (error) {
+      console.error("[AUTH INIT] Error creating pool:", error)
+      throw error
+    }
   } else if (!pool) {
+    console.log("[AUTH INIT] No DATABASE_URL, creating placeholder pool")
     // No DATABASE_URL available - use placeholder for build time
     // This allows builds to complete. At runtime, if DATABASE_URL is still missing,
     // the connection will fail when actually used, which is expected behavior
@@ -34,13 +50,27 @@ const getPool = () => {
       max: 1,
     })
     poolConnectionString = "postgresql://placeholder:placeholder@localhost:5432/placeholder"
+    console.log("[AUTH INIT] Placeholder pool created")
+  } else {
+    console.log("[AUTH INIT] Reusing existing pool")
   }
   
   return pool
 }
 
-export const auth = betterAuth({
-  database: getPool(),
+console.log("[AUTH INIT] Checking environment variables...")
+console.log("[AUTH INIT] GOOGLE_CLIENT_ID exists:", !!process.env.GOOGLE_CLIENT_ID)
+console.log("[AUTH INIT] GOOGLE_CLIENT_SECRET exists:", !!process.env.GOOGLE_CLIENT_SECRET)
+console.log("[AUTH INIT] BETTER_AUTH_SECRET exists:", !!process.env.BETTER_AUTH_SECRET)
+console.log("[AUTH INIT] BETTER_AUTH_URL:", process.env.BETTER_AUTH_URL)
+console.log("[AUTH INIT] NEXT_PUBLIC_APP_URL:", process.env.NEXT_PUBLIC_APP_URL)
+
+console.log("[AUTH INIT] Creating betterAuth instance...")
+const poolInstance = getPool()
+console.log("[AUTH INIT] Pool instance obtained:", !!poolInstance)
+
+const authConfig = {
+  database: poolInstance,
   emailAndPassword: {
     enabled: false, // We're only using Google OAuth
   },
@@ -53,7 +83,27 @@ export const auth = betterAuth({
   baseURL: process.env.BETTER_AUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
   basePath: "/api/auth",
   secret: process.env.BETTER_AUTH_SECRET!,
-})
+}
+
+console.log("[AUTH INIT] Auth config prepared, calling betterAuth()...")
+console.log("[AUTH INIT] baseURL:", authConfig.baseURL)
+console.log("[AUTH INIT] basePath:", authConfig.basePath)
+
+let auth: ReturnType<typeof betterAuth>
+try {
+  auth = betterAuth(authConfig)
+  console.log("[AUTH INIT] betterAuth() completed successfully")
+  console.log("[AUTH INIT] auth object keys:", Object.keys(auth))
+  console.log("[AUTH INIT] auth.handler exists:", !!auth.handler)
+  console.log("[AUTH INIT] auth.handler type:", typeof auth.handler)
+  console.log("[AUTH INIT] Auth module initialized successfully")
+} catch (error) {
+  console.error("[AUTH INIT] CRITICAL ERROR during auth initialization:", error)
+  console.error("[AUTH INIT] Error stack:", error instanceof Error ? error.stack : "No stack")
+  throw error
+}
+
+export { auth }
 
 export type Session = typeof auth.$Infer.Session
 
