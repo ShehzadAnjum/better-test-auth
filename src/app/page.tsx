@@ -49,10 +49,11 @@ export default function Home() {
           <div className="flex flex-col items-center gap-4">
             <p className="text-lg mb-4">Please sign in with your Google account</p>
             <button
-              onClick={async () => {
-                await signIn.social({
-                  provider: "google",
-                })
+              onClick={() => {
+                console.log("Sign in button clicked")
+                // Redirect directly to the better-auth social sign-in endpoint
+                const baseURL = process.env.NEXT_PUBLIC_APP_URL || window.location.origin
+                window.location.href = `${baseURL}/api/auth/sign-in/social/google`
               }}
               className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
             >
