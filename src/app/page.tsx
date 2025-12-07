@@ -49,16 +49,25 @@ export default function Home() {
           <div className="flex flex-col items-center gap-4">
             <p className="text-lg mb-4">Please sign in with your Google account</p>
             <button
-              onClick={() => {
-                // Use better-auth client function which should handle redirect
-                // If it doesn't work, check browser console for errors
-                signIn.social({
-                  provider: "google",
-                }).catch((error) => {
+              onClick={async () => {
+                try {
+                  // Use better-auth client function which should handle redirect
+                  await signIn.social({
+                    provider: "google",
+                  })
+                } catch (error) {
                   console.error("Sign in error:", error)
-                  // Fallback: direct redirect to auth endpoint
-                  window.location.href = `/api/auth/sign-in/social/google`
-                })
+                  // Try alternative route paths
+                  const baseURL = process.env.NEXT_PUBLIC_APP_URL || window.location.origin
+                  // Better-auth might use different route structures
+                  const routes = [
+                    `${baseURL}/api/auth/social/google`,
+                    `${baseURL}/api/auth/sign-in/social/google`,
+                    `${baseURL}/api/auth/oauth/google`,
+                  ]
+                  // Try the first route, if it fails the browser will show the error
+                  window.location.href = routes[0]
+                }
               }}
               className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
             >
