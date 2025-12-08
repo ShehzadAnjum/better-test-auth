@@ -70,15 +70,30 @@ const poolInstance = getPool()
 console.log("[AUTH INIT] Pool instance obtained:", !!poolInstance)
 
 // Determine base URL - prioritize explicit config, then Vercel URL, then fallback
+// This handles preview deployments, production, and local development
 const getBaseURL = () => {
   // Explicit configuration takes priority
   if (process.env.BETTER_AUTH_URL) {
     return process.env.BETTER_AUTH_URL
   }
   
-  // On Vercel, use the deployment URL
-  if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`
+  // On Vercel, handle preview vs production
+  if (process.env.VERCEL) {
+    // For preview deployments, use the dynamic VERCEL_URL
+    if (process.env.VERCEL_ENV === "preview" && process.env.VERCEL_URL) {
+      return `https://${process.env.VERCEL_URL}`
+    }
+    // For production, prefer explicit URL or use VERCEL_URL if available
+    if (process.env.VERCEL_ENV === "production") {
+      return process.env.BETTER_AUTH_URL || 
+             (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined) ||
+             process.env.NEXT_PUBLIC_APP_URL ||
+             "http://localhost:3000"
+    }
+    // Fallback for other Vercel environments
+    if (process.env.VERCEL_URL) {
+      return `https://${process.env.VERCEL_URL}`
+    }
   }
   
   // Fallback to public app URL or localhost
@@ -89,23 +104,35 @@ const baseURL = getBaseURL()
 console.log("[AUTH INIT] Final baseURL:", baseURL)
 console.log("[AUTH INIT] VERCEL_URL:", process.env.VERCEL_URL)
 console.log("[AUTH INIT] VERCEL:", process.env.VERCEL)
+console.log("[AUTH INIT] VERCEL_ENV:", process.env.VERCEL_ENV)
 
 // Build trusted origins for Vercel preview deployments
 // This allows preview branches (e.g., branch-abc.vercel.app) to work
+// Critical for OAuth callbacks on preview deployments
 const trustedOrigins: string[] = []
+
 if (process.env.VERCEL) {
-  // Add current Vercel URL if available
+  // Add current Vercel URL if available (for preview deployments)
   if (process.env.VERCEL_URL) {
     trustedOrigins.push(`https://${process.env.VERCEL_URL}`)
   }
-  // Add wildcard for preview deployments
+  // Add wildcard for all preview deployments
+  // This is essential for preview branches to work with OAuth
   trustedOrigins.push("https://*.vercel.app")
+  
+  // If we have a production URL, add it
+  if (process.env.BETTER_AUTH_URL && process.env.VERCEL_ENV === "production") {
+    trustedOrigins.push(process.env.BETTER_AUTH_URL)
+  }
 }
+
 // Always trust localhost for development
-if (process.env.NODE_ENV !== "production") {
+if (process.env.NODE_ENV !== "production" || !process.env.VERCEL) {
   trustedOrigins.push("http://localhost:3000")
 }
+
 // Add explicit trusted origins from env if set
+// This allows manual override for custom domains
 if (process.env.BETTER_AUTH_TRUSTED_ORIGINS) {
   const explicitOrigins = process.env.BETTER_AUTH_TRUSTED_ORIGINS.split(",").map(o => o.trim())
   trustedOrigins.push(...explicitOrigins)
@@ -132,12 +159,16 @@ const authConfig = {
     // Trust origins for preview deployments
     trustedOrigins: trustedOrigins.length > 0 ? trustedOrigins : undefined,
     // Cookie configuration for Vercel
+    // Using 'lax' for most cases, but can be overridden via env var if needed
     cookies: {
       sessionToken: {
         attributes: {
-          sameSite: "lax" as const,
+          // Use 'None' for cross-origin scenarios (requires secure: true)
+          // Use 'lax' for same-site scenarios (default, works for most cases)
+          sameSite: (process.env.BETTER_AUTH_COOKIE_SAMESITE as "lax" | "none" | "strict") || "lax",
           secure: process.env.NODE_ENV === "production" || process.env.VERCEL === "1",
           // Don't set domain explicitly - let it default to current domain
+          // Setting domain can break cookies on preview deployments
         },
       },
     },
